@@ -1,0 +1,24 @@
+# Unreal Engine generated files
+/Binaries/
+/DerivedDataCache/
+/Intermediate/
+/Saved/
+
+# IDE and local tooling files
+/.idea/
+/.vs/
+/.vscode/
+/.codex/
+
+# Visual Studio user-specific files
+*.suo
+*.user
+*.userprefs
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.VC.opendb
+
+# Operating system files
+.DS_Store
+Thumbs.db
