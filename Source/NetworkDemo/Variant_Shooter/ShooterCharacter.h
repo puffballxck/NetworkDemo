@@ -80,6 +80,7 @@ protected:
 	float RespawnTime = 5.0f;
 
 	FTimerHandle RespawnTimer;
+	FTimerHandle RoleDebugTimer;
 
 public:
 
@@ -98,6 +99,9 @@ protected:
 
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
+
+	/** Updates the short network-role diagnostic shown during PIE */
+	void UpdateRoleDebugMessage();
 
 	/** Gameplay cleanup */
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;

@@ -9,10 +9,48 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Camera/CameraComponent.h"
 #include "TimerManager.h"
 #include "ShooterGameMode.h"
+
+namespace
+{
+	const TCHAR* NetModeToDebugString(ENetMode NetMode)
+	{
+		switch (NetMode)
+		{
+		case NM_Standalone:
+			return TEXT("Standalone");
+		case NM_DedicatedServer:
+			return TEXT("DedicatedServer");
+		case NM_ListenServer:
+			return TEXT("ListenServer");
+		case NM_Client:
+			return TEXT("Client");
+		default:
+			return TEXT("Unknown");
+		}
+	}
+
+	const TCHAR* NetRoleToDebugString(ENetRole Role)
+	{
+		switch (Role)
+		{
+		case ROLE_Authority:
+			return TEXT("Authority");
+		case ROLE_AutonomousProxy:
+			return TEXT("AutonomousProxy");
+		case ROLE_SimulatedProxy:
+			return TEXT("SimulatedProxy");
+		case ROLE_None:
+			return TEXT("None");
+		default:
+			return TEXT("Unknown");
+		}
+	}
+}
 
 AShooterCharacter::AShooterCharacter()
 {
@@ -27,6 +65,9 @@ void AShooterCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	UpdateRoleDebugMessage();
+	GetWorld()->GetTimerManager().SetTimer(RoleDebugTimer, this, &AShooterCharacter::UpdateRoleDebugMessage, 0.5f, true);
+
 	// reset HP to max
 	CurrentHP = MaxHP;
 
@@ -40,6 +81,25 @@ void AShooterCharacter::EndPlay(EEndPlayReason::Type EndPlayReason)
 
 	// clear the respawn timer
 	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
+	GetWorld()->GetTimerManager().ClearTimer(RoleDebugTimer);
+}
+
+void AShooterCharacter::UpdateRoleDebugMessage()
+{
+	if (GEngine)
+	{
+		const FString DebugMessage = FString::Printf(
+			TEXT("[%s] %s | HasAuthority()=%s | GetLocalRole()=%s | GetRemoteRole()=%s | IsLocallyControlled()=%s"),
+			NetModeToDebugString(GetNetMode()),
+			*GetName(),
+			HasAuthority() ? TEXT("true") : TEXT("false"),
+			NetRoleToDebugString(GetLocalRole()),
+			NetRoleToDebugString(GetRemoteRole()),
+			IsLocallyControlled() ? TEXT("true") : TEXT("false"));
+
+		GEngine->AddOnScreenDebugMessage(static_cast<uint64>(GetUniqueID()), 1.0f,
+			HasAuthority() ? FColor::Green : FColor::Yellow, DebugMessage, false);
+	}
 }
 
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
