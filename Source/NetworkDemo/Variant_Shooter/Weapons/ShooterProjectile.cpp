@@ -17,6 +17,12 @@ AShooterProjectile::AShooterProjectile()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	// 允许服务器生成的 Projectile Actor 复制到客户端
+	bReplicates = true;
+
+	// 将服务器上的位置、旋转和速度等移动状态同步到客户端
+	SetReplicateMovement(true);
+
 	// create the collision component and assign it as the root
 	RootComponent = CollisionComponent = CreateDefaultSubobject<USphereComponent>(TEXT("Collision Component"));
 
