@@ -11,6 +11,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "Camera/CameraComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "ShooterGameMode.h"
 
@@ -21,6 +22,14 @@ AShooterCharacter::AShooterCharacter()
 
 	// configure movement
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 600.0f, 0.0f);
+}
+
+void AShooterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	// 将服务器权威生命值复制到所有客户端实例
+	DOREPLIFETIME(AShooterCharacter, CurrentHP);
 }
 
 void AShooterCharacter::BeginPlay()
@@ -40,6 +49,12 @@ void AShooterCharacter::EndPlay(EEndPlayReason::Type EndPlayReason)
 
 	// clear the respawn timer
 	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
+}
+
+void AShooterCharacter::OnRep_CurrentHP()
+{
+	// 仅同步客户端 HUD，不在属性复制回调中触发死亡逻辑
+	OnDamaged.Broadcast(FMath::Max(0.0f, CurrentHP / MaxHP));
 }
 
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -62,6 +77,12 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 float AShooterCharacter::TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
+	// 伤害只能由服务器权威实例处理，客户端副本不直接修改生命值
+	if (!HasAuthority())
+	{
+		return 0.0f;
+	}
+
 	// ignore if already dead
 	if (CurrentHP <= 0.0f)
 	{

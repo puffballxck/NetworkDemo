@@ -60,6 +60,12 @@ void AShooterProjectile::EndPlay(EEndPlayReason::Type EndPlayReason)
 
 void AShooterProjectile::NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
 {
+	// 命中处理只允许服务器权威实例执行，客户端复制副本不重复推进 Gameplay 状态
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	// ignore if we've already hit something else
 	if (bHit)
 	{

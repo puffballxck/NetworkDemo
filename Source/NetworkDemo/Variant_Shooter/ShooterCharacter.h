@@ -11,6 +11,7 @@ class AShooterWeapon;
 class UInputAction;
 class UInputComponent;
 class UPawnNoiseEmitterComponent;
+class FLifetimeProperty;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBulletCountUpdatedDelegate, int32, MagazineSize, int32, Bullets);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FDamagedDelegate, float, LifePercent);
@@ -56,7 +57,12 @@ protected:
 	float MaxHP = 500.0f;
 
 	/** Current HP remaining to this character */
+	UPROPERTY(ReplicatedUsing=OnRep_CurrentHP)
 	float CurrentHP = 0.0f;
+
+	/** 客户端收到服务器生命值复制后更新本地 HUD */
+	UFUNCTION()
+	void OnRep_CurrentHP();
 
 	/** Team ID for this character*/
 	UPROPERTY(EditAnywhere, Category="Team")
@@ -101,6 +107,9 @@ protected:
 
 	/** Gameplay cleanup */
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
+
+	/** 注册需要从服务器复制到客户端的角色属性 */
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
