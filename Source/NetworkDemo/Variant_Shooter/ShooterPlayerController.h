@@ -65,6 +65,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Shooter|Team")
 	TArray<FName> TeamTags;
 
+	/** 当前本地控制器已经绑定 HUD 委托的角色，换 Pawn 时用于解除旧监听 */
+	TWeakObjectPtr<AShooterCharacter> BoundShooterCharacter;
+
 protected:
 
 	/** Gameplay Initialization */
@@ -73,18 +76,30 @@ protected:
 	/** Initialize input bindings */
 	virtual void SetupInputComponent() override;
 
-	/** Pawn initialization */
+	/** 服务器占有 Pawn 时执行 Gameplay 初始化，并为本地玩家绑定 HUD 委托 */
 	virtual void OnPossess(APawn* InPawn) override;
 
-	/** Called if the possessed pawn is destroyed */
+	/** 客户端确认占有 Pawn 后再次确保本地 HUD 委托已绑定 */
+	virtual void AcknowledgePossession(APawn* P) override;
+
+	/** 解除旧 Pawn 上的本地 HUD 委托 */
+	virtual void OnUnPossess() override;
+
+	/** 为本地控制器绑定角色 HUD 委托 */
+	void BindLocalCharacterDelegates(AShooterCharacter* ShooterCharacter);
+
+	/** 解除当前角色上的 HUD 委托 */
+	void UnbindLocalCharacterDelegates();
+
+	/** 当前占有的 Pawn 被销毁时，负责清空 HUD 并触发服务器重生流程 */
 	UFUNCTION()
 	void OnPawnDestroyed(AActor* DestroyedActor);
 
-	/** Called when the bullet count on the possessed pawn is updated */
+	/** 收到角色弹药数量变化通知后刷新本地 HUD */
 	UFUNCTION()
 	void OnBulletCountUpdated(int32 MagazineSize, int32 Bullets);
 
-	/** Called when the possessed pawn is damaged */
+	/** 收到角色生命值变化通知后刷新本地 HUD */
 	UFUNCTION()
 	void OnPawnDamaged(float LifePercent);
 

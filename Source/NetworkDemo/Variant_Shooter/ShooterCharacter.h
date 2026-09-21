@@ -102,7 +102,7 @@ public:
 
 protected:
 
-	/** Gameplay initialization */
+	/** 游戏开始时由服务器权威端初始化生命值 */
 	virtual void BeginPlay() override;
 
 	/** Gameplay cleanup */
@@ -116,7 +116,7 @@ protected:
 
 public:
 
-	/** Handle incoming damage */
+	/** 仅在服务器权威端处理伤害并广播本机 HUD 更新 */
 	virtual float TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 public:
@@ -205,6 +205,9 @@ public:
 
 	/** Returns true if the character is dead */
 	bool IsDead() const;
+
+	/** 返回限制在 0 到 1 之间的当前生命百分比 */
+	float GetHealthPercent() const;
 
 	/** Sets the team ID for this character */
 	void SetTeam(uint8 Team);

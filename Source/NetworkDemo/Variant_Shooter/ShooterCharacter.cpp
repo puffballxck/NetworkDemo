@@ -14,6 +14,34 @@
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "ShooterGameMode.h"
+#include "NetworkDemo.h"
+
+namespace
+{
+	/** 返回便于区分 Listen Server/Client 的网络模式文本 */
+	const TCHAR* GetNetModeLabel(const UObject* Object)
+	{
+		const UWorld* World = Object ? Object->GetWorld() : nullptr;
+		if (!World)
+		{
+			return TEXT("Unknown");
+		}
+
+		switch (World->GetNetMode())
+		{
+		case NM_Standalone:
+			return TEXT("Standalone");
+		case NM_DedicatedServer:
+			return TEXT("DedicatedServer");
+		case NM_ListenServer:
+			return TEXT("ListenServer");
+		case NM_Client:
+			return TEXT("Client");
+		default:
+			return TEXT("Unknown");
+		}
+	}
+}
 
 AShooterCharacter::AShooterCharacter()
 {
@@ -36,11 +64,14 @@ void AShooterCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// reset HP to max
-	CurrentHP = MaxHP;
+	// 生命值由服务器初始化，客户端等待复制值，避免客户端覆盖服务器权威状态
+	if (HasAuthority())
+	{
+		CurrentHP = MaxHP;
+	}
 
-	// update the HUD
-	OnDamaged.Broadcast(1.0f);
+	// 本地绑定可能晚于 BeginPlay，因此控制器绑定时还会主动读取当前生命值
+	OnDamaged.Broadcast(GetHealthPercent());
 }
 
 void AShooterCharacter::EndPlay(EEndPlayReason::Type EndPlayReason)
@@ -54,7 +85,9 @@ void AShooterCharacter::EndPlay(EEndPlayReason::Type EndPlayReason)
 void AShooterCharacter::OnRep_CurrentHP()
 {
 	// 仅同步客户端 HUD，不在属性复制回调中触发死亡逻辑
-	OnDamaged.Broadcast(FMath::Max(0.0f, CurrentHP / MaxHP));
+	UE_LOG(LogNetworkDemo, Log, TEXT("[NetHUD] OnRep_CurrentHP NetMode=%s Character=%s CurrentHP=%.2f"),
+		GetNetModeLabel(this), *GetNameSafe(this), CurrentHP);
+	OnDamaged.Broadcast(GetHealthPercent());
 }
 
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -98,8 +131,8 @@ float AShooterCharacter::TakeDamage(float Damage, struct FDamageEvent const& Dam
 		Die();
 	}
 
-	// update the HUD
-	OnDamaged.Broadcast(FMath::Max(0.0f, CurrentHP / MaxHP));
+	// 服务器直接广播，保证 Listen Server 本地 HUD 不依赖客户端 OnRep
+	OnDamaged.Broadcast(GetHealthPercent());
 
 	return Damage;
 }
@@ -393,6 +426,12 @@ bool AShooterCharacter::IsDead() const
 {
 	// the character is dead if their current HP drops to zero
 	return CurrentHP <= 0.0f;
+}
+
+float AShooterCharacter::GetHealthPercent() const
+{
+	// 防止配置了非正 MaxHP 时出现除零，并将生命条输入限制在合法范围
+	return MaxHP > 0.0f ? FMath::Clamp(CurrentHP / MaxHP, 0.0f, 1.0f) : 0.0f;
 }
 
 void AShooterCharacter::SetTeam(uint8 Team)
