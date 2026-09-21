@@ -9,48 +9,10 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Camera/CameraComponent.h"
 #include "TimerManager.h"
 #include "ShooterGameMode.h"
-
-namespace
-{
-	const TCHAR* NetModeToDebugString(ENetMode NetMode)
-	{
-		switch (NetMode)
-		{
-		case NM_Standalone:
-			return TEXT("Standalone");
-		case NM_DedicatedServer:
-			return TEXT("DedicatedServer");
-		case NM_ListenServer:
-			return TEXT("ListenServer");
-		case NM_Client:
-			return TEXT("Client");
-		default:
-			return TEXT("Unknown");
-		}
-	}
-
-	const TCHAR* NetRoleToDebugString(ENetRole Role)
-	{
-		switch (Role)
-		{
-		case ROLE_Authority:
-			return TEXT("Authority");
-		case ROLE_AutonomousProxy:
-			return TEXT("AutonomousProxy");
-		case ROLE_SimulatedProxy:
-			return TEXT("SimulatedProxy");
-		case ROLE_None:
-			return TEXT("None");
-		default:
-			return TEXT("Unknown");
-		}
-	}
-}
 
 AShooterCharacter::AShooterCharacter()
 {
@@ -65,9 +27,6 @@ void AShooterCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UpdateRoleDebugMessage();
-	GetWorld()->GetTimerManager().SetTimer(RoleDebugTimer, this, &AShooterCharacter::UpdateRoleDebugMessage, 0.5f, true);
-
 	// reset HP to max
 	CurrentHP = MaxHP;
 
@@ -81,25 +40,6 @@ void AShooterCharacter::EndPlay(EEndPlayReason::Type EndPlayReason)
 
 	// clear the respawn timer
 	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
-	GetWorld()->GetTimerManager().ClearTimer(RoleDebugTimer);
-}
-
-void AShooterCharacter::UpdateRoleDebugMessage()
-{
-	if (GEngine)
-	{
-		const FString DebugMessage = FString::Printf(
-			TEXT("[%s] %s | HasAuthority()=%s | GetLocalRole()=%s | GetRemoteRole()=%s | IsLocallyControlled()=%s"),
-			NetModeToDebugString(GetNetMode()),
-			*GetName(),
-			HasAuthority() ? TEXT("true") : TEXT("false"),
-			NetRoleToDebugString(GetLocalRole()),
-			NetRoleToDebugString(GetRemoteRole()),
-			IsLocallyControlled() ? TEXT("true") : TEXT("false"));
-
-		GEngine->AddOnScreenDebugMessage(static_cast<uint64>(GetUniqueID()), 1.0f,
-			HasAuthority() ? FColor::Green : FColor::Yellow, DebugMessage, false);
-	}
 }
 
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -181,20 +121,62 @@ void AShooterCharacter::DoJumpEnd()
 
 void AShooterCharacter::DoStartFiring()
 {
-	// fire the current weapon
-	if (CurrentWeapon && !IsDead())
+	// 没有可用武器或角色已经死亡时，不处理开火输入
+	if (!IsValid(CurrentWeapon) || IsDead())
+	{
+		return;
+	}
+
+	// 服务器权威实例可以直接驱动武器，客户端则必须通过 RPC 请求服务器处理
+	if (HasAuthority())
 	{
 		CurrentWeapon->StartFiring();
+	}
+	else
+	{
+		ServerStartFiring();
 	}
 }
 
 void AShooterCharacter::DoStopFiring()
 {
-	// stop firing the current weapon
-	if (CurrentWeapon && !IsDead())
+	// 没有可用武器时无需发送停止请求
+	if (!IsValid(CurrentWeapon))
+	{
+		return;
+	}
+
+	// 与开始开火保持同一条权威路径
+	if (HasAuthority())
 	{
 		CurrentWeapon->StopFiring();
 	}
+	else
+	{
+		ServerStopFiring();
+	}
+}
+
+void AShooterCharacter::ServerStartFiring_Implementation()
+{
+	// RPC 到达服务器后再次校验状态，不能直接信任客户端请求
+	if (!IsValid(CurrentWeapon) || IsDead())
+	{
+		return;
+	}
+
+	CurrentWeapon->StartFiring();
+}
+
+void AShooterCharacter::ServerStopFiring_Implementation()
+{
+	// 服务器确认武器仍然有效后再停止开火
+	if (!IsValid(CurrentWeapon))
+	{
+		return;
+	}
+
+	CurrentWeapon->StopFiring();
 }
 
 void AShooterCharacter::DoSwitchWeapon()

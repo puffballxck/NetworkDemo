@@ -80,7 +80,6 @@ protected:
 	float RespawnTime = 5.0f;
 
 	FTimerHandle RespawnTimer;
-	FTimerHandle RoleDebugTimer;
 
 public:
 
@@ -99,9 +98,6 @@ protected:
 
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
-
-	/** Updates the short network-role diagnostic shown during PIE */
-	void UpdateRoleDebugMessage();
 
 	/** Gameplay cleanup */
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
@@ -127,6 +123,14 @@ public:
 
 	/** Handles jump end inputs from either controls or UI interfaces */
 	virtual void DoJumpEnd()  override;
+
+	/** 客户端请求服务器开始使用当前武器开火 */
+	UFUNCTION(Server, Reliable)
+	void ServerStartFiring();
+
+	/** 客户端请求服务器停止当前武器开火 */
+	UFUNCTION(Server, Reliable)
+	void ServerStopFiring();
 
 	/** Handles start firing input */
 	UFUNCTION(BlueprintCallable, Category="Input")
